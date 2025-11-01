@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Alert Service API
+  version: 1.0.0
+  description: |
+    Микросервис **Alert Service** отвечает за управление триггерами алертинга, 
+    обработку входящих данных телеметрии и ведение журнала срабатываний триггеров.
+    После получения данных телеметрии сервис анализирует их на предмет совпадения 
+    с существующими триггерами и, при необходимости, инициирует уведомления через Notification Service.
+
+servers:
+  - url: https://api.telemetry.local/alert
+    description: Production environment
+  - url: http://localhost:8082
+    description: Local testing
+
+paths:
+  /trigger:
+    get:
+      summary: Получить список всех триггеров
+      tags: [Triggers]
+      responses:
+        '200':
+          description: Список всех существующих триггеров
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trigger'
+    post:
+      summary: Создать новый триггер
+      tags: [Triggers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerCreateRequest'
+      responses:
+        '201':
+          description: Триггер успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trigger'
+    put:
+      summary: Обновить существующий триггер
+      tags: [Triggers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerUpdateRequest'
+      responses:
+        '200':
+          description: Триггер успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trigger'
+    delete:
+      summary: Удалить триггер
+      tags: [Triggers]
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Идентификатор триггера для удаления
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Триггер успешно удалён
+
+  /trigger/journal:
+    get:
+      summary: Получить журнал срабатываний триггеров
+      tags: [Journal]
+      parameters:
+        - name: limit
+          in: query
+          description: Максимальное количество записей
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Список записей журнала срабатываний
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TriggerEvent'
+    delete:
+      summary: Очистить журнал срабатываний
+      tags: [Journal]
+      responses:
+        '204':
+          description: Журнал успешно очищен
+
+  /telemetry:
+    post:
+      summary: Отправить новые данные телеметрии для анализа триггеров
+      tags: [Telemetry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryData'
+      responses:
+        '202':
+          description: Данные приняты в обработку
+
+components:
+  schemas:
+    Trigger:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "cpu_high_load"
+        name:
+          type: string
+          example: "Высокая загрузка CPU"
+        condition:
+          type: string
+          example: "cpu_usage > 90"
+        notificationMethod:
+          type: string
+          example: "telegram"
+        isActive:
+          type: boolean
+          example: true
+
+    TriggerCreateRequest:
+      type: object
+      required: [name, condition, notificationMethod]
+      properties:
+        name:
+          type: string
+          example: "Высокая загрузка CPU"
+        condition:
+          type: string
+          example: "cpu_usage > 90"
+        notificationMethod:
+          type: string
+          example: "slack"
+
+    TriggerUpdateRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          example: "cpu_high_load"
+        name:
+          type: string
+          example: "Высокая загрузка CPU"
+        condition:
+          type: string
+          example: "cpu_usage > 85"
+        notificationMethod:
+          type: string
+          example: "telegram"
+        isActive:
+          type: boolean
+          example: true
+
+    TriggerEvent:
+      type: object
+      properties:
+        triggerId:
+          type: string
+          example: "cpu_high_load"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-10-31T14:25:43Z"
+        telemetryId:
+          type: string
+          example: "telemetry_batch_132"
+        message:
+          type: string
+          example: "CPU usage exceeded 90% threshold on node-12"
+
+    TelemetryData:
+      type: object
+      required: [source, metrics]
+      properties:
+        source:
+          type: string
+          example: "web-app-instance-2"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-10-31T14:23:11Z"
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+          example:
+            cpu_usage: 95.3
+            memory_usage: 78.1
